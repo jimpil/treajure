@@ -96,6 +96,6 @@
    Think `.findFirst()` in terms of Streams, or `clojure.core/some`
    in terms of lazy-seqs."
   ([xform stream]
-   (stream-some xform stream identity))
+   (stream-some identity xform stream))
   ([f xform stream]
    (trance/some xform (stream-reducible stream (some-fn f)))))
