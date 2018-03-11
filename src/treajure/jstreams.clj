@@ -95,5 +95,7 @@
   "A 'bailing-out' transducing context for Java streams (parallel or not).
    Think `.findFirst()` in terms of Streams, or `clojure.core/some`
    in terms of lazy-seqs."
-  [xform stream]
-  (trance/some xform (stream-reducible stream (some-fn identity))))
+  ([xform stream]
+   (stream-some xform stream identity))
+  ([f xform stream]
+   (trance/some xform (stream-reducible stream (some-fn f)))))
