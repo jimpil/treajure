@@ -21,27 +21,6 @@
               (recur (f state line))
               state)))))))
 
-(defn lines-reducible-between
-  "Like `lines-reducible`, but for a range of lines (from - to) from the specified reader.
-   Useful for parallel processing using multiple readers against the same resource."
-  [^BufferedReader r from to]
-  (reify IReduceInit
-    (reduce [_ f init]
-      (with-open [rdr r]
-        (loop [i 0
-               state init]
-          (if (reduced? state)
-            @state
-            (let [line (.readLine rdr)]
-              (if (or (nil? line) ;; EOF
-                      (>= i to))  ;; out-of range from the right - bail out
-                state
-                (if (>= i from)
-                  ;; in-range - proceed with state transformation
-                  (recur (unchecked-inc i) (f state line))
-                  ;; out-of range from the left - proceed without state transformation
-                  (recur (unchecked-inc i) state))))))))))
-
 
 (defn iterator-reducible
   "Similar to `iterator-seq`, but returns something reducible."
@@ -104,7 +83,7 @@
        (ensure-reduced x)))))
 
 (def rf-some-interruptible
-  "Reducing cousin of `clojure.core/some`."
+  "Reducing cousin of `clojure.core/some`, which respects thread interruption."
   (rf-some-gen #(.isInterrupted (Thread/currentThread))))
 
 (defn some

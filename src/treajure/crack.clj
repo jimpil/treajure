@@ -1,8 +1,11 @@
 (ns treajure.crack
   (:require [clojure.java.io :as io]
             [clojure.math.combinatorics :as combi]
-            [treajure.trance :as trance])
-  (:import (java.util.concurrent.atomic AtomicLong)))
+            [treajure.trance :as trance]
+            [treajure.jlamda :as jl]
+            [treajure.jstreams :as js])
+  (:import (java.util.concurrent.atomic AtomicLong)
+           (java.nio.file Files Paths)))
 
 
 (defn- search-space
@@ -41,33 +44,19 @@
   )
 
 
-(defn dict-attack [try-fn ^String dict-path line-count]
-  (let [cpus (.. Runtime getRuntime availableProcessors)
-        normal-partition (quot line-count cpus)
-        splits* (take (dec cpus)
-                      (iterate (fn [[pstart pend]]
-                                 [pend (+ pend normal-partition)])
-                               [0 normal-partition]))
-        r* (rem line-count cpus)
-        last-partition (let [pend (-> splits* last second)]
-                         [pend (cond-> (+ pend normal-partition)
-                                       (not (zero? r*)) (+ r*))])
-        splits (-> splits* vec (conj last-partition))
-
-        end-counter (AtomicLong. (count splits))
-        end? #(zero? (.decrementAndGet end-counter))
-        answer (promise)
-        futures (mapv (fn [[from to]]
-                        (search-space (trance/lines-reducible-between (io/reader dict-path) from to)
-                                      try-fn
-                                      answer
-                                      end?))
-                      splits)]
-    (when-let [res @answer]
-      (run! future-cancel futures)
-      res)))
+(defn dict-attack
+  "See https://bugs.openjdk.java.net/browse/JDK-8072773
+   on why the parallel version of this will only work properly on Java 1.9."
+  [try-fn ^String dict-path]
+  (js/stream-some
+    (map try-fn)
+    (-> dict-path
+        (Paths/get (into-array String []))
+        Files/lines
+        ;.parallel ;; no point doing that until 1.9
+        )))
 
 (comment
   (dict-attack
-    #(when (= "1943" %) %)
+    #(and (= "1943" %) %)
     "/home/dimitris/Desktop/test-dict.txt"))

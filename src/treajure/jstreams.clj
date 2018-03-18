@@ -11,7 +11,7 @@
 ;; and `stream-some` (more of a convenience)
 
 
-(defn- bo-spliterator ;; bailing out Spliterator
+(defn- abortive-spliterator ;; short-circuiting Spliterator
   "Wraps a Spliterator such that it will terminate early
   (i.e. when <done?>, a fn of no args, returns true)."
   [^Spliterator internal done?]
@@ -29,16 +29,16 @@
            (.tryAdvance internal action)))
     (trySplit [_]
       (when-let [new-split (.trySplit internal)]
-        (bo-spliterator new-split done?)))))
+        (abortive-spliterator new-split done?)))))
 
-(defn- bo-stream ;; bailing out Stream
+(defn- abortive-stream ;; ;; short-circuiting Stream
   "Wraps a Stream such that it can terminate early
   (i.e. when <done?>, a fn of no args, returns true)."
   ^Stream [^Stream stream done?]
   (let [parallel? (.isParallel stream)]
     (-> stream
         .spliterator
-        (bo-spliterator done?)
+        (abortive-spliterator done?)
         (StreamSupport/stream parallel?))))
 
 
@@ -55,7 +55,7 @@
        (let [dp (promise)
              done? (partial realized? dp)
              done  (partial deliver dp true)]
-         (with-open [estream (bo-stream s done?)]
+         (with-open [estream (abortive-stream s done?)]
            (.reduce estream
                     init
                     ;; accumulator
@@ -92,9 +92,11 @@
      (into to xform (stream-reducible stream)))))
 
 (defn stream-some
-  "A 'bailing-out' transducing context for Java streams (parallel or not).
-   Think `.findFirst()` in terms of Streams, or `clojure.core/some`
-   in terms of lazy-seqs."
+  "A real short-circuiting transducing context for Java streams (parallel or not).
+   For sequential Streams, rather similar to `.findFirst()` in terms of Streams,
+   or `clojure.core/some` in terms of lazy-seqs. For parallel Streams, more
+   like `.findAny()`, with the added bonus of aborting the search on the
+   'other' threads as soon as an answer is found on 'some' thread."
   ([xform stream]
    (stream-some identity xform stream))
   ([f xform stream]
